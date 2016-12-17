@@ -12,7 +12,8 @@ def test_core():
         path = "/home/svenni/Dropbox/studies/cinpla/cinpla-shared/project/axonaio/2016-03-02-083928-1596/raw/02031602.set"
     else:
         print("Sorry, tests are not yet available.")
-        exit(0)
+        return
+        
     axona_file = pyxona.File(path)
 
     for analog_signal in axona_file.analog_signals:
@@ -24,4 +25,3 @@ def test_core():
 
     for tracking_data in axona_file.tracking:
         print(tracking_data)
-        
