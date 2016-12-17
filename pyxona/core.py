@@ -13,8 +13,8 @@ import glob
 import numpy as np
 
 
-def parse_params(text):
-    params = {}
+def parse_attrs(text):
+    attrs = {}
 
     for line in text.split("\n"):
         line = line.strip()
@@ -25,17 +25,17 @@ def parse_params(text):
         line_splitted = line.split(" ", 1)
 
         name = line_splitted[0]
-        params[name] = None
+        attrs[name] = None
 
         if len(line_splitted) > 1:
             try:
-                params[name] = int(line_splitted[1])
+                attrs[name] = int(line_splitted[1])
             except:
                 try:
-                    params[name] = float(line_splitted[1])
+                    attrs[name] = float(line_splitted[1])
                 except:
-                    params[name] = line_splitted[1]
-    return params
+                    attrs[name] = line_splitted[1]
+    return attrs
 
 
 def parse_header_and_leave_cursor(file_handle):
@@ -51,9 +51,9 @@ def parse_header_and_leave_cursor(file_handle):
         if header[-len(search_string):] == search_string:
             break
 
-    params = parse_params(header)
+    attrs = parse_attrs(header)
 
-    return params
+    return attrs
 
 
 def assert_end_of_data(file_handle):
@@ -87,7 +87,8 @@ class Channel:
 
 
 class Shank:
-    def __init__(self, shank_id, filename, channels, adc_fullscale):
+    def __init__(self, shank_id, filename, channels, adc_fullscale, attrs):
+        self.attrs = attrs
         self.filename = filename
         self.shank_id = shank_id
         self.channels = channels
@@ -108,15 +109,15 @@ class Shank:
         
     def _read_spike_trains(self):
         with open(self.filename, "rb") as f:
-            params = parse_header_and_leave_cursor(f)
+            attrs = parse_header_and_leave_cursor(f)
 
             shank_index = self.shank_id
-            bytes_per_timestamp = params.get("bytes_per_timestamp", 4)
-            bytes_per_sample = params.get("bytes_per_sample", 1)
-            num_spikes = params.get("num_spikes", 0)
-            num_chans = params.get("num_chans", 1)
-            samples_per_spike = params.get("samples_per_spike", 50)
-            timebase = int(params.get("timebase", "96000 hz").split(" ")[0]) * pq.Hz
+            bytes_per_timestamp = attrs.get("bytes_per_timestamp", 4)
+            bytes_per_sample = attrs.get("bytes_per_sample", 1)
+            num_spikes = attrs.get("num_spikes", 0)
+            num_chans = attrs.get("num_chans", 1)
+            samples_per_spike = attrs.get("samples_per_spike", 50)
+            timebase = int(attrs.get("timebase", "96000 hz").split(" ")[0]) * pq.Hz
 
             bytes_per_spike_without_timestamp = samples_per_spike * bytes_per_sample
             bytes_per_spike = bytes_per_spike_without_timestamp + bytes_per_timestamp
@@ -150,7 +151,8 @@ class Shank:
             waveforms=waveforms,
             spike_count=num_spikes,
             channel_count=num_chans,
-            samples_per_spike=samples_per_spike
+            samples_per_spike=samples_per_spike,
+            attrs=attrs
         )
         self._spike_trains.append(spike_train)
     
@@ -161,9 +163,11 @@ class Shank:
 
 
 class SpikeTrain:
-    def __init__(self, times, waveforms, spike_count, channel_count, samples_per_spike):
+    def __init__(self, times, waveforms, 
+                 spike_count, channel_count, samples_per_spike, attrs):
         self.times = times
         self.waveforms = waveforms
+        self.attrs = attrs
         
         assert(self.waveforms.shape[0] == spike_count)
         assert(self.waveforms.shape[1] == channel_count)
@@ -189,10 +193,11 @@ class SpikeTrain:
 
 
 class AnalogSignal:
-    def __init__(self, channel_id, signal, sample_rate):
+    def __init__(self, channel_id, signal, sample_rate, attrs):
         self.channel_id = channel_id
         self.signal = signal
         self.sample_rate = sample_rate
+        self.attrs = attrs
         
     def __str__(self):
         return "<Axona analog signal: channel: {}, shape: {}, sample_rate: {}>".format(
@@ -201,7 +206,8 @@ class AnalogSignal:
 
 
 class TrackingData:
-    def __init__(self, times, positions):
+    def __init__(self, times, positions, attrs):
+        self.attrs = attrs
         self.times = times
         self.positions = positions
         
@@ -226,12 +232,12 @@ class File:
         with open(self._absolute_filename, "r") as f:
             text = f.read()
 
-        params = parse_params(text)
+        attrs = parse_attrs(text)
 
-        self._adc_fullscale = float(params["ADC_fullscale_mv"]) * 1000.0 * pq.uV
-        self._duration = float(params["duration"]) * pq.s
-        self._tracked_spots_count = int(params["tracked_spots"])
-        self._params = params
+        self._adc_fullscale = float(attrs["ADC_fullscale_mv"]) * 1000.0 * pq.uV
+        self._duration = float(attrs["duration"]) * pq.s
+        self._tracked_spots_count = int(attrs["tracked_spots"])
+        self.attrs = attrs
         
         self._shanks = []
         self._analog_signals = []
@@ -241,6 +247,12 @@ class File:
         self._spike_trains_dirty = True
         self._analog_signals_dirty = True
         self._tracking_dirty = True
+        
+    def shank(self, channel_id):
+        if self._shanks_dirty:
+            self._read_shanks()
+            
+        return self._channel_id_to_shank[channel_id]
         
     @property
     def shanks(self):
@@ -276,8 +288,8 @@ class File:
             basename, extension = os.path.splitext(shank_filename)
             shank_id = int(extension[1:])
             with open(shank_filename, "rb") as f:
-                shank_params = parse_header_and_leave_cursor(f)
-                num_chans = shank_params["num_chans"]
+                shank_attrs = parse_header_and_leave_cursor(f)
+                num_chans = shank_attrs["num_chans"]
                 channels = []
                 for i in range(num_chans):
                     channel_id = self._channel_count + i
@@ -292,7 +304,8 @@ class File:
                     shank_id,
                     filename=shank_filename,
                     channels=channels,
-                    adc_fullscale=self._adc_fullscale
+                    adc_fullscale=self._adc_fullscale,
+                    attrs=shank_attrs
                 )
 
                 self._shanks.append(shank)
@@ -313,7 +326,7 @@ class File:
         # TODO split into two functions, one for mapping and one for gain lookup
         global_channel_index = shank_index * 4 + channel_index
         param_name = "gain_ch_{}".format(global_channel_index)
-        return float(self._params[param_name])
+        return float(self.attrs[param_name])
 
     def _read_epoch():
         # TODO read epoch data?
@@ -329,16 +342,16 @@ class File:
             raise IOError("'.pos' file not found:" + pos_filename)
 
         with open(pos_filename, "rb") as f:
-            params = parse_header_and_leave_cursor(f)
+            attrs = parse_header_and_leave_cursor(f)
 
-            sample_rate_split = params["sample_rate"].split(" ")
+            sample_rate_split = attrs["sample_rate"].split(" ")
             assert(sample_rate_split[1] == "hz")
             sample_rate = float(sample_rate_split[0]) * pq.Hz  # sample_rate 50.0 hz
 
-            eeg_samples_per_position = float(params["EEG_samples_per_position"])  # TODO remove?
-            pos_samples_count = int(params["num_pos_samples"])
-            bytes_per_timestamp = int(params["bytes_per_timestamp"])
-            bytes_per_coord = int(params["bytes_per_coord"])
+            eeg_samples_per_position = float(attrs["EEG_samples_per_position"])  # TODO remove?
+            pos_samples_count = int(attrs["num_pos_samples"])
+            bytes_per_timestamp = int(attrs["bytes_per_timestamp"])
+            bytes_per_coord = int(attrs["bytes_per_coord"])
 
             timestamp_dtype = ">i" + str(bytes_per_timestamp)
             coord_dtype = ">i" + str(bytes_per_coord)
@@ -356,10 +369,10 @@ class File:
             data = np.fromfile(f, dtype=dtype, count=pos_samples_count)
             assert_end_of_data(f)
 
-            time_scale = float(params["timebase"].split(" ")[0]) * pq.Hz
+            time_scale = float(attrs["timebase"].split(" ")[0]) * pq.Hz
             times = data["t"].astype(float) / time_scale
 
-            length_scale = float(params["pixels_per_metre"]) / pq.m
+            length_scale = float(attrs["pixels_per_metre"]) / pq.m
             coords = data["coords"].astype(float) / length_scale
             # positions with value 1023 are missing
             for i in range(2 * self._tracked_spots_count):
@@ -367,7 +380,8 @@ class File:
 
             tracking_data = TrackingData(
                 times=times,
-                positions=coords
+                positions=coords,
+                attrs=attrs
             )
             
             self._tracking.append(tracking_data)
@@ -393,33 +407,33 @@ class File:
                 suffix = "1"
             suffix = int(suffix)
             with open(eeg_filename, "rb") as f:
-                params = parse_header_and_leave_cursor(f)
-                params["raw_filename"] = eeg_filename
+                attrs = parse_header_and_leave_cursor(f)
+                attrs["raw_filename"] = eeg_filename
 
                 if file_type == "eeg":
-                    sample_count = int(params["num_EEG_samples"])
+                    sample_count = int(attrs["num_EEG_samples"])
                 elif file_type == "egf":
-                    sample_count = int(params["num_EGF_samples"])
+                    sample_count = int(attrs["num_EGF_samples"])
                 else:
                     raise IOError("Unknown file type. Should be .eeg or .efg.")
 
-                sample_rate_split = params["sample_rate"].split(" ")
-                bytes_per_sample = params["bytes_per_sample"]
+                sample_rate_split = attrs["sample_rate"].split(" ")
+                bytes_per_sample = attrs["bytes_per_sample"]
                 assert(sample_rate_split[1].lower() == "hz")
                 sample_rate = float(sample_rate_split[0]) * pq.Hz  # sample_rate 250.0 hz
 
-                sample_dtype = (('<i' + str(bytes_per_sample), 1), params["num_chans"])
+                sample_dtype = (('<i' + str(bytes_per_sample), 1), attrs["num_chans"])
                 data = np.fromfile(f, dtype=sample_dtype, count=sample_count)
                 assert_end_of_data(f)
 
-                eeg_final_channel_id = self._params["EEG_ch_" + str(suffix)]
-                eeg_mode = self._params["mode_ch_" + str(eeg_final_channel_id)]
-                ref_id = self._params["b_in_ch_" + str(eeg_final_channel_id)]
-                eeg_original_channel_id = self._params["ref_" + str(ref_id)]
+                eeg_final_channel_id = self.attrs["EEG_ch_" + str(suffix)]
+                eeg_mode = self.attrs["mode_ch_" + str(eeg_final_channel_id)]
+                ref_id = self.attrs["b_in_ch_" + str(eeg_final_channel_id)]
+                eeg_original_channel_id = self.attrs["ref_" + str(ref_id)]
 
-                params["channel_id"] = eeg_original_channel_id
+                attrs["channel_id"] = eeg_original_channel_id
 
-                gain = self._params["gain_ch_{}".format(eeg_final_channel_id)]
+                gain = self.attrs["gain_ch_{}".format(eeg_final_channel_id)]
 
                 signal = scale_analog_signal(data,
                                              gain,
@@ -431,7 +445,8 @@ class File:
                 analog_signal = AnalogSignal(
                     channel_id=eeg_original_channel_id,
                     signal=signal,
-                    sample_rate=sample_rate
+                    sample_rate=sample_rate,
+                    attrs=attrs
                 )
 
                 self._analog_signals.append(analog_signal)

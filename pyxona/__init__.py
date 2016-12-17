@@ -1,1 +1,1 @@
-from .core import AnalogSignal, File, Shank, SpikeTrain
+from .core import AnalogSignal, Channel, File, Shank, SpikeTrain, TrackingData
