@@ -155,6 +155,7 @@ class Shank:
             attrs=attrs
         )
         self._spike_trains.append(spike_train)
+        self._spike_trains_dirty = False
     
     def __str__(self):
         return "<Axona shank {}: channel_count: {}>".format(
