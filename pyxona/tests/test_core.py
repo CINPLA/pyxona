@@ -18,10 +18,10 @@ def test_core():
 
     for analog_signal in axona_file.analog_signals:
         print(analog_signal)
-        print(axona_file.shank(channel_id=analog_signal.channel_id))
+        print(axona_file.channel_group(channel_id=analog_signal.channel_id))
 
-    for shank in axona_file.shanks:
-        print(shank)
+    for channel_group in axona_file.channel_groups:
+        print(channel_group)
 
     for tracking_data in axona_file.tracking:
         print(tracking_data)

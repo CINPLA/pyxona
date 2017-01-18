@@ -12,6 +12,8 @@ import os
 import glob
 import numpy as np
 
+# TODO use pyxona in AxonaIO
+
 
 def parse_attrs(text):
     attrs = {}
@@ -86,14 +88,12 @@ class Channel:
         self.gain = gain
 
 
-class Shank:
-    def __init__(self, shank_id, filename, channels, adc_fullscale, attrs):
+class ChannelGroup:
+    def __init__(self, channel_group_id, filename, channels, adc_fullscale, attrs):
         self.attrs = attrs
         self.filename = filename
-        self.shank_id = shank_id
+        self.channel_group_id = channel_group_id
         self.channels = channels
-        self._spike_trains = []
-        self._spike_trains_dirty = True
         self._adc_fullscale = adc_fullscale
         
     @property
@@ -101,17 +101,11 @@ class Shank:
         return self.analog_signals
         
     @property
-    def spike_trains(self):
-        if self._spike_trains_dirty:
-            self._read_spike_trains()
-            
-        return self._spike_trains
-        
-    def _read_spike_trains(self):
+    def spike_train(self):
         with open(self.filename, "rb") as f:
             attrs = parse_header_and_leave_cursor(f)
 
-            shank_index = self.shank_id
+            channel_group_index = self.channel_group_id
             bytes_per_timestamp = attrs.get("bytes_per_timestamp", 4)
             bytes_per_sample = attrs.get("bytes_per_sample", 1)
             num_spikes = attrs.get("num_spikes", 0)
@@ -146,7 +140,7 @@ class Shank:
                                         bytes_per_sample)
 
         # TODO get proper t_stop
-        spike_train = SpikeTrain(
+        return SpikeTrain(
             times=times,
             waveforms=waveforms,
             spike_count=num_spikes,
@@ -154,12 +148,10 @@ class Shank:
             samples_per_spike=samples_per_spike,
             attrs=attrs
         )
-        self._spike_trains.append(spike_train)
-        self._spike_trains_dirty = False
     
     def __str__(self):
-        return "<Axona shank {}: channel_count: {}>".format(
-            self.shank_id, len(self.channels)
+        return "<Axona channel_group {}: channel_count: {}>".format(
+            self.channel_group_id, len(self.channels)
         )
 
 
@@ -240,27 +232,34 @@ class File:
         self._tracked_spots_count = int(attrs["tracked_spots"])
         self.attrs = attrs
         
-        self._shanks = []
+        self._channel_groups = []
         self._analog_signals = []
         self._tracking = []
 
-        self._shanks_dirty = True
-        self._spike_trains_dirty = True
+        self._channel_groups_dirty = True
         self._analog_signals_dirty = True
         self._tracking_dirty = True
         
-    def shank(self, channel_id):
-        if self._shanks_dirty:
-            self._read_shanks()
-            
-        return self._channel_id_to_shank[channel_id]
+    @property
+    def session(self):
+        return self._base_filename
         
     @property
-    def shanks(self):
-        if self._shanks_dirty:
-            self._read_shanks()
+    def related_files(self):
+        return glob.glob(os.path.join(self._path, self._base_filename + ".*"))
+        
+    def channel_group(self, channel_id):
+        if self._channel_groups_dirty:
+            self._read_channel_groups()
             
-        return self._shanks
+        return self._channel_id_to_channel_group[channel_id]
+        
+    @property
+    def channel_groups(self):
+        if self._channel_groups_dirty:
+            self._read_channel_groups()
+            
+        return self._channel_groups
 
     @property
     def analog_signals(self):
@@ -276,56 +275,56 @@ class File:
 
         return self._tracking
 
-    def _read_shanks(self):
+    def _read_channel_groups(self):
         # TODO this file reading can be removed, perhaps?
-        shank_filenames = glob.glob(os.path.join(self._path, self._base_filename) + ".[0-9]*")
+        channel_group_filenames = glob.glob(os.path.join(self._path, self._base_filename) + ".[0-9]*")
 
-        self._channel_id_to_shank = {}
-        self._shank_id_to_shank = {}
+        self._channel_id_to_channel_group = {}
+        self._channel_group_id_to_channel_group = {}
         self._channel_count = 0
-        self._shanks = []
-        for shank_filename in shank_filenames:
-            # increment before, because shanks start at 1
-            basename, extension = os.path.splitext(shank_filename)
-            shank_id = int(extension[1:])
-            with open(shank_filename, "rb") as f:
-                shank_attrs = parse_header_and_leave_cursor(f)
-                num_chans = shank_attrs["num_chans"]
+        self._channel_groups = []
+        for channel_group_filename in channel_group_filenames:
+            # increment before, because channel_groups start at 1
+            basename, extension = os.path.splitext(channel_group_filename)
+            channel_group_id = int(extension[1:]) - 1
+            with open(channel_group_filename, "rb") as f:
+                channel_group_attrs = parse_header_and_leave_cursor(f)
+                num_chans = channel_group_attrs["num_chans"]
                 channels = []
                 for i in range(num_chans):
                     channel_id = self._channel_count + i
                     channel = Channel(
                         channel_id,
-                        name="channel_{}_shank_{}_internal_{}".format(channel_id, shank_id, i),
-                        gain=self._channel_gain(shank_id, channel_id)
+                        name="channel_{}_channel_group_{}_internal_{}".format(channel_id, channel_group_id, i),
+                        gain=self._channel_gain(channel_group_id, channel_id)
                     )
                     channels.append(channel)
 
-                shank = Shank(
-                    shank_id,
-                    filename=shank_filename,
+                channel_group = ChannelGroup(
+                    channel_group_id,
+                    filename=channel_group_filename,
                     channels=channels,
                     adc_fullscale=self._adc_fullscale,
-                    attrs=shank_attrs
+                    attrs=channel_group_attrs
                 )
 
-                self._shanks.append(shank)
-                self._shank_id_to_shank[shank_id] = shank
+                self._channel_groups.append(channel_group)
+                self._channel_group_id_to_channel_group[channel_group_id] = channel_group
 
                 for i in range(num_chans):
                     channel_id = self._channel_count + i
-                    self._channel_id_to_shank[channel_id] = shank
+                    self._channel_id_to_channel_group[channel_id] = channel_group
 
                 # increment after, because channels start at 0
                 self._channel_count += num_chans
 
         # TODO add channels only for files that exist
         self._channel_ids = np.arange(self._channel_count)
-        self._shanks_dirty = False
+        self._channel_groups_dirty = False
 
-    def _channel_gain(self, shank_index, channel_index):
+    def _channel_gain(self, channel_group_index, channel_index):
         # TODO split into two functions, one for mapping and one for gain lookup
-        global_channel_index = shank_index * 4 + channel_index
+        global_channel_index = channel_group_index * 4 + channel_index
         param_name = "gain_ch_{}".format(global_channel_index)
         return float(self.attrs[param_name])
 
