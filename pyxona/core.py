@@ -11,6 +11,7 @@ import quantities as pq
 import os
 import glob
 import numpy as np
+from datetime import datetime
 
 # TODO use pyxona in AxonaIO
 
@@ -139,7 +140,7 @@ class ChannelGroup:
                                         self._adc_fullscale,
                                         bytes_per_sample)
 
-        # TODO get proper t_stop
+        # TODO get proper t_stop Mikkel says: isn't that just the duration, Mikkel answers: yes it is
         return SpikeTrain(
             times=times,
             waveforms=waveforms,
@@ -228,6 +229,12 @@ class File:
         attrs = parse_attrs(text)
 
         self._adc_fullscale = float(attrs["ADC_fullscale_mv"]) * 1000.0 * pq.uV
+        if all(key in attrs for key in ['trial_date', 'trial_time']):
+            self._start_datetime = datetime.strptime(attrs['trial_date'] +
+                                                     attrs['trial_time'],
+                                                     '%A, %d %b %Y%H:%M:%S')
+        else:
+            self._start_datetime = None
         self._duration = float(attrs["duration"]) * pq.s
         self._tracked_spots_count = int(attrs["tracked_spots"])
         self.attrs = attrs
