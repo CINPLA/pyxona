@@ -80,7 +80,7 @@ def scale_analog_signal(value, gain, adc_fullscale_mv, bytes_per_sample):
     result = (value / max_value) * (adc_fullscale_mv / gain)
     result = result
     return result
-    
+
 
 class Channel:
     def __init__(self, index, name, gain):
@@ -96,11 +96,11 @@ class ChannelGroup:
         self.channel_group_id = channel_group_id
         self.channels = channels
         self._adc_fullscale = adc_fullscale
-        
+
     @property
     def analog_signals(self):
         return self.analog_signals
-        
+
     @property
     def spike_train(self):
         with open(self.filename, "rb") as f:
@@ -113,6 +113,7 @@ class ChannelGroup:
             num_chans = attrs.get("num_chans", 1)
             samples_per_spike = attrs.get("samples_per_spike", 50)
             timebase = int(attrs.get("timebase", "96000 hz").split(" ")[0]) * pq.Hz
+            sample_rate = attrs.get("rawrate", 48000) * pq.Hz
 
             bytes_per_spike_without_timestamp = samples_per_spike * bytes_per_sample
             bytes_per_spike = bytes_per_spike_without_timestamp + bytes_per_timestamp
@@ -139,7 +140,8 @@ class ChannelGroup:
                                         channel_gain_matrix,
                                         self._adc_fullscale,
                                         bytes_per_sample)
-
+        # HACK until we find the sign on the signal hafting-fyhn group always have reversed spikes
+        waveforms = -waveforms
         # TODO get proper t_stop Mikkel says: isn't that just the duration, Mikkel answers: yes it is
         return SpikeTrain(
             times=times,
@@ -147,9 +149,10 @@ class ChannelGroup:
             spike_count=num_spikes,
             channel_count=num_chans,
             samples_per_spike=samples_per_spike,
+            sample_rate=sample_rate,
             attrs=attrs
         )
-    
+
     def __str__(self):
         return "<Axona channel_group {}: channel_count: {}>".format(
             self.channel_group_id, len(self.channels)
@@ -157,20 +160,22 @@ class ChannelGroup:
 
 
 class SpikeTrain:
-    def __init__(self, times, waveforms, 
-                 spike_count, channel_count, samples_per_spike, attrs):
+    def __init__(self, times, waveforms,
+                 spike_count, channel_count, samples_per_spike,
+                 sample_rate, attrs):
         self.times = times
         self.waveforms = waveforms
         self.attrs = attrs
-        
+
         assert(self.waveforms.shape[0] == spike_count)
         assert(self.waveforms.shape[1] == channel_count)
         assert(self.waveforms.shape[2] == samples_per_spike)
-        
+
         self.spike_count = spike_count
         self.channel_count = channel_count
         self.samples_per_spike = samples_per_spike
-        
+        self.sample_rate = sample_rate
+
     @property
     def num_spikes(self):
         """
@@ -192,7 +197,7 @@ class AnalogSignal:
         self.signal = signal
         self.sample_rate = sample_rate
         self.attrs = attrs
-        
+
     def __str__(self):
         return "<Axona analog signal: channel: {}, shape: {}, sample_rate: {}>".format(
             self.channel_id, self.signal.shape, self.sample_rate
@@ -204,7 +209,7 @@ class TrackingData:
         self.attrs = attrs
         self.times = times
         self.positions = positions
-        
+
     def __str__(self):
         return "<Axona tracking data: times shape: {}, positions shape: {}>".format(
             self.times.shape, self.positions.shape
@@ -238,7 +243,7 @@ class File:
         self._duration = float(attrs["duration"]) * pq.s
         self._tracked_spots_count = int(attrs["tracked_spots"])
         self.attrs = attrs
-        
+
         self._channel_groups = []
         self._analog_signals = []
         self._tracking = []
@@ -246,26 +251,26 @@ class File:
         self._channel_groups_dirty = True
         self._analog_signals_dirty = True
         self._tracking_dirty = True
-        
+
     @property
     def session(self):
         return self._base_filename
-        
+
     @property
     def related_files(self):
         return glob.glob(os.path.join(self._path, self._base_filename + ".*"))
-        
+
     def channel_group(self, channel_id):
         if self._channel_groups_dirty:
             self._read_channel_groups()
-            
+
         return self._channel_id_to_channel_group[channel_id]
-        
+
     @property
     def channel_groups(self):
         if self._channel_groups_dirty:
             self._read_channel_groups()
-            
+
         return self._channel_groups
 
     @property
@@ -343,7 +348,7 @@ class File:
         # TODO fix for multiple .pos files if necessary
         # TODO store attributes, such as pixels_per_metre
         self._tracking = []
-        
+
         pos_filename = os.path.join(self._path, self._base_filename + ".pos")
         if not os.path.exists(pos_filename):
             raise IOError("'.pos' file not found:" + pos_filename)
@@ -390,9 +395,9 @@ class File:
                 positions=coords,
                 attrs=attrs
             )
-            
+
             self._tracking.append(tracking_data)
-            
+
         self._tracking_dirty = False
 
     def _read_analog_signals(self):
@@ -457,5 +462,5 @@ class File:
                 )
 
                 self._analog_signals.append(analog_signal)
-                
+
         self._analog_signals_dirty = False
