@@ -491,7 +491,7 @@ class File:
         cut_basename = os.path.join(self._path, self._base_filename)
         cut_files = glob.glob(cut_basename + "_[0-9]*.cut")
         for cut_filename in sorted(cut_files):
-            split_basename = os.path.basename(cut_filename).split('_')[1]
+            split_basename = os.path.basename(cut_filename).split(self._base_filename+"_")[-1]
             suffix = split_basename.split('.')[0]
             channel_group_id = int(suffix) - 1  # -1 to match channel_group_id
             lines = ""
