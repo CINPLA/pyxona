@@ -215,6 +215,15 @@ class TrackingData:
             self.times.shape, self.positions.shape
         )
 
+class CutData:
+    def __init__(self, channel_group_id, indices):
+        self.channel_group_id = channel_group_id
+        self.indices = indices
+
+    def __str__(self):
+        return "<Axona cut data: channel group id: {}, indices shape: {}>".format(
+            self.channel_group_id, self.indices.shape
+        )
 
 class File:
     """
@@ -246,12 +255,12 @@ class File:
 
         self._channel_groups = []
         self._analog_signals = []
-        self._clusters = []
+        self._cuts = []
         self._tracking = []
 
         self._channel_groups_dirty = True
         self._analog_signals_dirty = True
-        self._clusters_dirty = True
+        self._cuts_dirty = True
         self._tracking_dirty = True
         
 
@@ -294,11 +303,11 @@ class File:
         
         
     @property
-    def clusters(self):
-        if self._clusters_dirty:
-            self._read_clusters()
+    def cuts(self):
+        if self._cuts_dirty:
+            self._read_cuts()
 
-        return self._clusters
+        return self._cuts
 
     def _read_channel_groups(self):
         # TODO this file reading can be removed, perhaps?
@@ -480,23 +489,29 @@ class File:
 
 
 
-    def _read_clusters(self):
+    def _read_cuts(self):
         cut_basename = os.path.join(self._path, self._base_filename)
         cut_files = glob.glob(cut_basename + "_[0-9]*.cut")
-        print(cut_basename)
         for cut_filename in sorted(cut_files):
-            # split_basename = os.path.basename(cut_filename).split('_')[1]
-            # suffix = split_basename.split('.')[0]
-            # suffix = int(suffix)
+            split_basename = os.path.basename(cut_filename).split('_')[1]
+            suffix = split_basename.split('.')[0]
+            channel_group_id = int(suffix)
             lines = ""
-            self._clusters.append([])
             with open(cut_filename, "r") as f:
                 for line in f:
                     if line.lstrip().startswith('Exact_cut_for'):
                         break
                 lines = f.readlines()
                 
+                indices = []
                 for line in lines:
-                    self._clusters[-1] += list(map(int, line.strip().split("  ")))
+                    indices += list(map(int, line.strip().split("  ")))
+                    
+                cluster = CutData(
+                    channel_group_id=channel_group_id,
+                    indices=indices
+                )
+                self._cuts.append(cluster)
+                
             
-        self._clusters_dirty = False
+        self._cuts_dirty = False
