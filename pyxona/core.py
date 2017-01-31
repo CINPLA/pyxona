@@ -246,11 +246,14 @@ class File:
 
         self._channel_groups = []
         self._analog_signals = []
+        self._clusters = []
         self._tracking = []
 
         self._channel_groups_dirty = True
         self._analog_signals_dirty = True
+        self._clusters_dirty = True
         self._tracking_dirty = True
+        
 
     @property
     def session(self):
@@ -258,7 +261,9 @@ class File:
 
     @property
     def related_files(self):
-        return glob.glob(os.path.join(self._path, self._base_filename + ".*"))
+        file_path = os.path.join(self._path, self._base_filename)
+        cut_files = glob.glob(os.path.join(file_path + "_[0-9]*.cut"))
+        return glob.glob(os.path.join(file_path + ".*")) +  cut_files
 
     def channel_group(self, channel_id):
         if self._channel_groups_dirty:
@@ -286,6 +291,14 @@ class File:
             self._read_tracking()
 
         return self._tracking
+        
+        
+    @property
+    def clusters(self):
+        if self._clusters_dirty:
+            self._read_clusters()
+
+        return self._clusters
 
     def _read_channel_groups(self):
         # TODO this file reading can be removed, perhaps?
@@ -462,5 +475,28 @@ class File:
                 )
 
                 self._analog_signals.append(analog_signal)
-
+                
         self._analog_signals_dirty = False
+
+
+
+    def _read_clusters(self):
+        cut_basename = os.path.join(self._path, self._base_filename)
+        cut_files = glob.glob(cut_basename + "_[0-9]*.cut")
+        print(cut_basename)
+        for cut_filename in sorted(cut_files):
+            # split_basename = os.path.basename(cut_filename).split('_')[1]
+            # suffix = split_basename.split('.')[0]
+            # suffix = int(suffix)
+            lines = ""
+            self._clusters.append([])
+            with open(cut_filename, "r") as f:
+                for line in f:
+                    if line.lstrip().startswith('Exact_cut_for'):
+                        break
+                lines = f.readlines()
+                
+                for line in lines:
+                    self._clusters[-1] += list(map(int, line.strip().split("  ")))
+            
+        self._clusters_dirty = False
