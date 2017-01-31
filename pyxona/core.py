@@ -487,15 +487,13 @@ class File:
                 
         self._analog_signals_dirty = False
 
-
-
     def _read_cuts(self):
         cut_basename = os.path.join(self._path, self._base_filename)
         cut_files = glob.glob(cut_basename + "_[0-9]*.cut")
         for cut_filename in sorted(cut_files):
             split_basename = os.path.basename(cut_filename).split('_')[1]
             suffix = split_basename.split('.')[0]
-            channel_group_id = int(suffix)
+            channel_group_id = int(suffix) - 1  # -1 to match channel_group_id
             lines = ""
             with open(cut_filename, "r") as f:
                 for line in f:
@@ -509,9 +507,8 @@ class File:
                     
                 cluster = CutData(
                     channel_group_id=channel_group_id,
-                    indices=np.asarray(indices)
+                    indices=np.asarray(indices, dtype=np.int)
                 )
                 self._cuts.append(cluster)
                 
-            
         self._cuts_dirty = False
