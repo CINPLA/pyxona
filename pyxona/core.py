@@ -490,6 +490,7 @@ class File:
         self._analog_signals_dirty = False
 
     def _read_cuts(self):
+        self._cuts = []
         # TODO: we only read indices. Is it enough?
         cut_basename = os.path.join(self._path, self._base_filename)
         cut_files = glob.glob(cut_basename + "_[0-9]*.cut")

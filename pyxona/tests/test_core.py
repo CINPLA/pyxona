@@ -25,3 +25,6 @@ def test_core():
 
     for tracking_data in axona_file.tracking:
         print(tracking_data)
+
+    for cut in axona_file.cuts:
+        print(cut)
