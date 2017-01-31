@@ -216,6 +216,16 @@ class TrackingData:
         )
         
         
+class InpData:
+    def __init__(self, times, event_type, value):
+        self.times = times
+        self.event_type = event_type
+        self.value = value
+
+    def __str__(self):
+        return "<Axona inp data: times shape: {}>".format(self.times.shape)        
+
+
 class CutData:
     def __init__(self, channel_group_id, indices):
         self.channel_group_id = channel_group_id
@@ -258,14 +268,17 @@ class File:
         self._channel_groups = []
         self._analog_signals = []
         self._cuts = []
+        self._inp_data = []
         self._tracking = []
 
         self._channel_groups_dirty = True
         self._analog_signals_dirty = True
         self._cuts_dirty = True
+        self._inp_data_dirty = True
         self._tracking_dirty = True
         
-
+        self._read_inp_data()
+        
     @property
     def session(self):
         return self._base_filename
@@ -274,7 +287,8 @@ class File:
     def related_files(self):
         file_path = os.path.join(self._path, self._base_filename)
         cut_files = glob.glob(os.path.join(file_path + "_[0-9]*.cut"))
-        return glob.glob(os.path.join(file_path + ".*")) +  cut_files
+        
+        return glob.glob(os.path.join(file_path + ".*")) + cut_files
 
     def channel_group(self, channel_id):
         if self._channel_groups_dirty:
@@ -302,8 +316,7 @@ class File:
             self._read_tracking()
 
         return self._tracking
-        
-        
+                
     @property
     def cuts(self):
         if self._cuts_dirty:
@@ -367,7 +380,56 @@ class File:
     def _read_epoch():
         # TODO read epoch data?
         pass
+        
+    def _read_inp_data(self):
+        """
+        Reads axona .inp files.
+        Event type can be 'I', 'O', or 'K' representing input, 
+        output, and keypress, respectively. 
+        The value of all event types is assumed to have dtype='>i', 
+        even though this is not true for keypress.
+        """
+        self._inp_data = []
+        inp_filename = os.path.join(self._path, self._base_filename + ".inp")
+        if not os.path.exists(inp_filename):
+            raise IOError("'.inp' file not found:" + inp_filename)
+        
+        with open(inp_filename, "rb") as f:
+            attrs = parse_header_and_leave_cursor(f)
+            
+            sample_rate_split = attrs["timebase"].split(" ")
+            assert(sample_rate_split[1] == "hz")
+            sample_rate = float(sample_rate_split[0]) * pq.Hz  # sample_rate 50.0 hz
+            
+            num_inp_samples = int(attrs["num_inp_samples"])
+            bytes_per_timestamp = int(attrs["bytes_per_timestamp"])
+            bytes_per_type = int(attrs["bytes_per_type"])
+            bytes_per_value = int(attrs["bytes_per_value"])
 
+            timestamp_dtype = ">i" + str(bytes_per_timestamp)
+            type_dtype = "S"
+            value_dtype = ">i" + str(bytes_per_value)
+            
+            # read data:
+            dtype = np.dtype([("t", (timestamp_dtype, 1)),
+                              ("event_type", (type_dtype, bytes_per_type)),
+                              ("value", (value_dtype, 1))])
+
+            data = np.fromfile(f, dtype=dtype, count=-1)
+            end_of_file = data[-1]  # TODO: check if end of data
+            
+            data = data[:-1]
+            times = data["t"].astype(float) / sample_rate
+            
+            inp_data = InpData(
+                times=times,
+                event_type=data["event_type"].astype(str),
+                value=data["value"].astype(float),
+            )
+            self._inp_data.append(inp_data)
+
+        self._inp_data_dirty = False
+        
     def _read_tracking(self):
         # TODO fix for multiple .pos files if necessary
         # TODO store attributes, such as pixels_per_metre
@@ -494,6 +556,10 @@ class File:
         # TODO: we only read indices. Is it enough?
         cut_basename = os.path.join(self._path, self._base_filename)
         cut_files = glob.glob(cut_basename + "_[0-9]*.cut")
+        
+        if not len(cut_files) > 0:
+            raise IOError("'.cut' file(s) not found")
+
         for cut_filename in sorted(cut_files):
             split_basename = os.path.basename(cut_filename).split(self._base_filename+"_")[-1]
             suffix = split_basename.split('.')[0]
