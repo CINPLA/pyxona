@@ -509,7 +509,7 @@ class File:
                     
                 cluster = CutData(
                     channel_group_id=channel_group_id,
-                    indices=indices
+                    indices=np.asarray(indices)
                 )
                 self._cuts.append(cluster)
                 
