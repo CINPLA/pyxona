@@ -419,7 +419,7 @@ class File:
             end_of_file = data[-1]  # TODO: check if end of data
             
             data = data[:-1]
-            times = data["t"].astype(float) / sample_rate
+            times = data["t"].astype(float) / sample_rate pq.s
             
             inp_data = InpData(
                 times=times,
