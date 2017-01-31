@@ -217,7 +217,8 @@ class TrackingData:
         
         
 class InpData:
-    def __init__(self, times, event_type, value):
+    def __init__(self, duration, times, event_type, value):
+        self.duration = duration
         self.times = times
         self.event_type = event_type
         self.value = value
@@ -316,6 +317,13 @@ class File:
             self._read_tracking()
 
         return self._tracking
+    
+    @property
+    def inp_data(self):
+        if self._inp_data_dirty:
+            self._read_inp_data()
+
+        return self._inp_data
                 
     @property
     def cuts(self):
@@ -389,7 +397,6 @@ class File:
         The value of all event types is assumed to have dtype='>i', 
         even though this is not true for keypress.
         """
-        self._inp_data = []
         inp_filename = os.path.join(self._path, self._base_filename + ".inp")
         if not os.path.exists(inp_filename):
             raise IOError("'.inp' file not found:" + inp_filename)
@@ -401,6 +408,7 @@ class File:
             assert(sample_rate_split[1] == "hz")
             sample_rate = float(sample_rate_split[0]) * pq.Hz  # sample_rate 50.0 hz
             
+            duration = float(attrs["duration"]) * pq.s
             num_inp_samples = int(attrs["num_inp_samples"])
             bytes_per_timestamp = int(attrs["bytes_per_timestamp"])
             bytes_per_type = int(attrs["bytes_per_type"])
@@ -419,15 +427,16 @@ class File:
             end_of_file = data[-1]  # TODO: check if end of data
             
             data = data[:-1]
-            times = data["t"].astype(float) / sample_rate pq.s
+            times = data["t"].astype(float) / sample_rate * pq.s
             
             inp_data = InpData(
+                duration=duration,
                 times=times,
                 event_type=data["event_type"].astype(str),
                 value=data["value"].astype(float),
             )
-            self._inp_data.append(inp_data)
-
+            
+        self._inp_data = inp_data
         self._inp_data_dirty = False
         
     def _read_tracking(self):
