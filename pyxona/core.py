@@ -214,7 +214,8 @@ class TrackingData:
         return "<Axona tracking data: times shape: {}, positions shape: {}>".format(
             self.times.shape, self.positions.shape
         )
-
+        
+        
 class CutData:
     def __init__(self, channel_group_id, indices):
         self.channel_group_id = channel_group_id
@@ -224,7 +225,8 @@ class CutData:
         return "<Axona cut data: channel group id: {}, indices shape: {}>".format(
             self.channel_group_id, self.indices.shape
         )
-
+        
+        
 class File:
     """
     Class for reading experimental data from an Axona dataset.
@@ -488,6 +490,7 @@ class File:
         self._analog_signals_dirty = False
 
     def _read_cuts(self):
+        # TODO: we only read indices. Is it enough?
         cut_basename = os.path.join(self._path, self._base_filename)
         cut_files = glob.glob(cut_basename + "_[0-9]*.cut")
         for cut_filename in sorted(cut_files):
@@ -499,16 +502,15 @@ class File:
                 for line in f:
                     if line.lstrip().startswith('Exact_cut_for'):
                         break
-                lines = f.readlines()
-                
+                lines = f.read()
+                lines = lines.replace("\n", "").strip()
                 indices = []
-                for line in lines:
-                    indices += list(map(int, line.strip().split("  ")))
-                    
-                cluster = CutData(
+                indices += list(map(int, lines.split("  ")))
+                
+                cut = CutData(
                     channel_group_id=channel_group_id,
                     indices=np.asarray(indices, dtype=np.int)
                 )
-                self._cuts.append(cluster)
+                self._cuts.append(cut)
                 
         self._cuts_dirty = False
