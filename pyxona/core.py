@@ -15,6 +15,10 @@ from datetime import datetime
 
 # TODO use pyxona in AxonaIO
 
+data_end_string = "\r\ndata_end\r\n"
+data_end_length = len(data_end_string)
+
+assert(data_end_length == 12)
 
 def parse_attrs(text):
     attrs = {}
@@ -49,7 +53,7 @@ def parse_header_and_leave_cursor(file_handle):
         header += str(byte, 'latin-1')
 
         if not byte:
-            raise IOError("Hit end of file '" + eeg_filename + "'' before '" + search_string + "' found.")
+            raise IOError("Hit end of file before '" + search_string + "' found.")
 
         if header[-len(search_string):] == search_string:
             break
@@ -62,7 +66,7 @@ def parse_header_and_leave_cursor(file_handle):
 def assert_end_of_data(file_handle):
     remaining_data = str(file_handle.read(), 'latin1')
     assert(remaining_data.strip() == "data_end")
-
+    
 
 def scale_analog_signal(value, gain, adc_fullscale_mv, bytes_per_sample):
     """
@@ -414,24 +418,31 @@ class File:
 
             timestamp_dtype = ">i" + str(bytes_per_timestamp)
             type_dtype = "S"
-            value_dtype = ">i" + str(bytes_per_value)
+            value_dtype = 'i1'
             
             # read data:
             dtype = np.dtype([("t", (timestamp_dtype, 1)),
                               ("event_type", (type_dtype, bytes_per_type)),
-                              ("value", (value_dtype, 1))])
-
-            data = np.fromfile(f, dtype=dtype, count=-1)
-            end_of_file = data[-1]  # TODO: check if end of data
+                              ("value", (value_dtype, bytes_per_value))])
             
-            data = data[:-1]
-            times = data["t"].astype(float) / sample_rate * pq.s
+            current_position = f.tell()
+            f.seek(-data_end_length, os.SEEK_END)
+            end_position = f.tell()
+            data_byte_count = end_position - current_position
+            data_count = int(data_byte_count / dtype.itemsize)
+            assert_end_of_data(f)
+            f.seek(current_position, os.SEEK_SET)
+            
+            data = np.fromfile(f, dtype=dtype, count=data_count)
+            
+            assert_end_of_data(f)            
+            times = data["t"].astype(float) / sample_rate
             
             inp_data = InpData(
                 duration=duration,
                 times=times,
                 event_type=data["event_type"].astype(str),
-                value=data["value"].astype(float),
+                value=data["value"],
             )
             
         self._inp_data = inp_data
@@ -443,7 +454,7 @@ class File:
         pos_filename = os.path.join(self._path, self._base_filename + ".pos")
         if not os.path.exists(pos_filename):
             raise IOError("'.pos' file not found:" + pos_filename)
-
+            
         with open(pos_filename, "rb") as f:
             attrs = parse_header_and_leave_cursor(f)
 
@@ -468,9 +479,13 @@ class File:
             dtype = np.dtype([("t", (timestamp_dtype, 1)),
                               ("coords", (coord_dtype, 1), 2 * self._tracked_spots_count),
                               ("pixel_count", (pixel_count_dtype, 1), 2)])
-
+        
             data = np.fromfile(f, dtype=dtype, count=pos_samples_count)
-            assert_end_of_data(f)
+            
+            try:
+                assert_end_of_data(f)
+            except AssertionError:
+                print("WARNING: found remaining data while parsing pos file")
 
             time_scale = float(attrs["timebase"].split(" ")[0]) * pq.Hz
             times = data["t"].astype(float) / time_scale
@@ -480,19 +495,19 @@ class File:
             # positions with value 1023 are missing
             for i in range(2 * self._tracked_spots_count):
                 coords[np.where(data["coords"][:, i] == 1023)] = np.nan * pq.m
-
+                
+                
             tracking_data = TrackingData(
                 times=times,
                 positions=coords,
                 attrs=attrs
             )
-
+ 
         self._tracking = tracking_data
         self._tracking_dirty = False
 
     def _read_analog_signals(self):
         # TODO read for specific channel
-
         # TODO check that .egf file exists
 
         self._analog_signals = []
