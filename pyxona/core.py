@@ -462,7 +462,7 @@ class File:
             assert(sample_rate_split[1] == "hz")
             sample_rate = float(sample_rate_split[0]) * pq.Hz  # sample_rate 50.0 hz
 
-            eeg_samples_per_position = float(attrs["EEG_samples_per_position"])  # TODO remove?
+            eeg_samples_per_position = float(attrs["EEG_samples_per_position"])
             pos_samples_count = int(attrs["num_pos_samples"])
             bytes_per_timestamp = int(attrs["bytes_per_timestamp"])
             bytes_per_coord = int(attrs["bytes_per_coord"])
@@ -489,14 +489,21 @@ class File:
 
             time_scale = float(attrs["timebase"].split(" ")[0]) * pq.Hz
             times = data["t"].astype(float) / time_scale
-
-            length_scale = float(attrs["pixels_per_metre"]) / pq.m
-            coords = data["coords"].astype(float) / length_scale
+        
+            window_min_x = float(attrs["window_min_x"]) 
+            window_max_x = float(attrs["window_max_x"]) 
+            window_min_y = float(attrs["window_min_y"]) 
+            window_max_y = float(attrs["window_max_y"]) 
+            xsize = window_max_x - window_min_x
+            ysize = window_max_y - window_min_y
+            length_scale = [xsize, ysize, xsize, ysize]
+            coords = data["coords"].astype(float) * pq.m
+            
             # positions with value 1023 are missing
             for i in range(2 * self._tracked_spots_count):
+                coords[:, i] /= length_scale[i]
                 coords[np.where(data["coords"][:, i] == 1023)] = np.nan * pq.m
-                
-                
+                    
             tracking_data = TrackingData(
                 times=times,
                 positions=coords,
