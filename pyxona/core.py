@@ -351,7 +351,7 @@ class File:
                     channel = Channel(
                         channel_id,
                         name="channel_{}_channel_group_{}_internal_{}".format(channel_id, channel_group_id, i),
-                        gain=self._channel_gain(channel_group_id, channel_id)
+                        gain=self._channel_gain(channel_group_id, i)
                     )
                     channels.append(channel)
 
