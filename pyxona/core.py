@@ -269,16 +269,14 @@ class File:
         self._channel_groups = []
         self._analog_signals = []
         self._cuts = []
-        self._inp_data = []
-        self._tracking = []
+        self._inp_data = None
+        self._tracking = None
 
         self._channel_groups_dirty = True
         self._analog_signals_dirty = True
         self._cuts_dirty = True
         self._inp_data_dirty = True
         self._tracking_dirty = True
-        
-        self._read_inp_data()
         
     @property
     def session(self):
@@ -440,10 +438,8 @@ class File:
         self._inp_data_dirty = False
         
     def _read_tracking(self):
-        # TODO fix for multiple .pos files if necessary
         # TODO store attributes, such as pixels_per_metre
-        self._tracking = []
-
+    
         pos_filename = os.path.join(self._path, self._base_filename + ".pos")
         if not os.path.exists(pos_filename):
             raise IOError("'.pos' file not found:" + pos_filename)
@@ -491,8 +487,7 @@ class File:
                 attrs=attrs
             )
 
-            self._tracking.append(tracking_data)
-
+        self._tracking = tracking_data
         self._tracking_dirty = False
 
     def _read_analog_signals(self):
