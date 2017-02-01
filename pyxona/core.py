@@ -448,9 +448,7 @@ class File:
         self._inp_data = inp_data
         self._inp_data_dirty = False
         
-    def _read_tracking(self):
-        # TODO store attributes, such as pixels_per_metre
-    
+    def _read_tracking(self):    
         pos_filename = os.path.join(self._path, self._base_filename + ".pos")
         if not os.path.exists(pos_filename):
             raise IOError("'.pos' file not found:" + pos_filename)
@@ -499,7 +497,7 @@ class File:
             length_scale = [xsize, ysize, xsize, ysize]
             coords = data["coords"].astype(float) * pq.m
             
-            # positions with value 1023 are missing
+            # dacq doc: positions with value 1023 are missing 
             for i in range(2 * self._tracked_spots_count):
                 coords[:, i] /= length_scale[i]
                 coords[np.where(data["coords"][:, i] == 1023)] = np.nan * pq.m
@@ -579,7 +577,6 @@ class File:
 
     def _read_cuts(self):
         self._cuts = []
-        # TODO: we only read indices. Is it enough?
         cut_basename = os.path.join(self._path, self._base_filename)
         cut_files = glob.glob(cut_basename + "_[0-9]*.cut")
         
