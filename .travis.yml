@@ -16,7 +16,7 @@ install:
   - conda config --set always_yes yes --set changeps1 no
   - conda update -q conda
   - conda install pytest
-  - conda install quantities
+  - conda install -c conda-forge quantities=0.11.1 
 script:
   - python setup.py develop; pytest -s
 deploy:
