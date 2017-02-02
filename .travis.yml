@@ -29,5 +29,3 @@ after_success:
   - PACKAGE=$(conda build -c conda-forge . --output)
   - echo "Package name $PACKAGE"
 - anaconda upload -t $CONDA_UPLOAD_TOKEN -u cinpla --force $PACKAGE
-script:
-- docker run -v $(pwd):/app continuumio/anaconda3 bash -c "cd /app && .travis/test.sh"
