@@ -16,7 +16,10 @@ install:
   - conda config --set always_yes yes --set changeps1 no
   - conda update -q conda
 script:
-  - echo "No tests to run..."
+  - pytest -s
+deploy:
+  skip_cleanup: true
+after_success:
   - conda install conda-build anaconda-client
   - mkdir ~/conda-bld
   - conda config --set anaconda_upload no
@@ -25,7 +28,4 @@ script:
   - conda build -c conda-forge .
   - PACKAGE=$(conda build -c conda-forge . --output)
   - echo "Package name $PACKAGE"
-  - anaconda -t $CONDA_UPLOAD_TOKEN upload -u cinpla --force $PACKAGE
-deploy:
-  skip_cleanup: true
-after_success:
+- anaconda -t $CONDA_UPLOAD_TOKEN upload -u cinpla --force $PACKAGE
