@@ -1,5 +1,15 @@
 """
-Authors: Svenn-Arne Dragly (CINPLA), Milad Hobbi Mobarhan (CINPLA)
+Python library for reading Axona files.
+Depends on: sys
+            os
+            glob
+            datetime
+            numpy
+            quantities
+            
+Authors: Svenn-Arne Dragly @CINPLA,
+         Milad H. Mobarhan @CINPLA,
+         Mikkel E. Lepperød @CINPLA
 """
 
 from __future__ import division
@@ -13,12 +23,12 @@ import glob
 import numpy as np
 from datetime import datetime
 
-# TODO use pyxona in AxonaIO
 
 data_end_string = "\r\ndata_end\r\n"
 data_end_length = len(data_end_string)
 
 assert(data_end_length == 12)
+
 
 def parse_attrs(text):
     attrs = {}
@@ -386,10 +396,6 @@ class File:
         global_channel_index = channel_group_index * 4 + channel_index
         param_name = "gain_ch_{}".format(global_channel_index)
         return float(self.attrs[param_name])
-
-    def _read_epoch():
-        # TODO read epoch data?
-        pass
         
     def _read_inp_data(self):
         """
@@ -507,7 +513,7 @@ class File:
                 positions=coords,
                 attrs=attrs
             )
- 
+    
         self._tracking = tracking_data
         self._tracking_dirty = False
 
