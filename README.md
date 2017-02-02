@@ -10,3 +10,13 @@ Python library for reading Axona files. The following Axona files are currently 
 * .X
 * .eegX
 * .egfX
+
+## License
+
+This project is licensed under GNU GPL v3.0 - see the [LICENSE.md](https://github.com/miladh/lgn-simulator/blob/dev/LICENSE) file for details
+
+## Authors
+
+- [Svenn-Arne Dragly](https://github.com/dragly)
+- [Milad H. Mobarhan](https://github.com/miladh) 
+- [Mikkel E. Lepperød](https://github.com/lepmik)
