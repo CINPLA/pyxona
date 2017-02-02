@@ -16,7 +16,7 @@ install:
   - conda config --set always_yes yes --set changeps1 no
   - conda update -q conda
 script:
-  - echo "No tests to run..."
+  - pytest -s
 deploy:
   skip_cleanup: true
 after_success:
