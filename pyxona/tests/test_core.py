@@ -14,6 +14,7 @@ def _check_array_equal(a, b):
         return ((a == b) | (np.isnan(a) & np.isnan(b))).all()
 
 
+
 # def test_spike_train_reader():
 #     axona_file = pyxona.File(axona_file_path)
 # 
