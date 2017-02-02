@@ -1,0 +1,37 @@
+package:
+  name: pyxona
+  version: {{ environ['VERSION'] }}
+  
+source:
+  path: .
+ 
+build:
+  script_env:
+    - VERSION
+    - CONDA_BLD_PATH
+  script: python setup.py install
+
+requirements:
+  build:
+    - python
+    - setuptools
+    - pip
+    - numpy
+    - quantities
+
+  run:
+    - python
+    - setuptools
+    - pip
+    - numpy
+    - scipy
+    - quantities
+
+test:
+  imports:
+    - pyxona
+
+about:
+  home: https://github.com/CINPLA/pyxona/
+  license: GPL
+  license_file: LICENSE

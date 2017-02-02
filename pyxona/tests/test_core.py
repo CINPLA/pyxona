@@ -8,7 +8,6 @@ axona_file_path = os.path.join(current_dir, "axona_raw_data/DVH_2013103103.set")
 
 
 def _check_array_equal(a, b):
-    print("shape:", a.shape, b.shape)
     if a.dtype == "<U1" and b.dtype == "<U1": 
         return (a == b).all()
     else:
