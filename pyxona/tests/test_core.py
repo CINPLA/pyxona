@@ -23,8 +23,8 @@ def test_core():
     for channel_group in axona_file.channel_groups:
         print(channel_group)
 
-    for tracking_data in axona_file.tracking:
-        print(tracking_data)
+
+    print(axona_file.tracking)
 
     for cut in axona_file.cuts:
         print(cut)
