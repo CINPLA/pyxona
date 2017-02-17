@@ -231,11 +231,11 @@ class TrackingData:
         
         
 class InpData:
-    def __init__(self, duration, times, event_type, value):
+    def __init__(self, duration, times, event_types, values):
         self.duration = duration
         self.times = times
-        self.event_type = event_type
-        self.value = value
+        self.event_types = event_types
+        self.values = values
 
     def __str__(self):
         return "<Axona inp data: times shape: {}>".format(self.times.shape)        
@@ -428,15 +428,23 @@ class File:
             
             # read data:
             dtype = np.dtype([("t", (timestamp_dtype, 1)),
-                              ("event_type", (type_dtype, bytes_per_type)),
-                              ("value", (value_dtype, bytes_per_value))])
+                              ("event_types", (type_dtype, bytes_per_type)),
+                              ("values", (value_dtype, bytes_per_value))])
             
+            # num_inp_samples cannot be used because it 
+            # does not include outputs ('O').
+            # We need to find the length of the data manually
+            # by seeking to the end of the file and subtracting
+            # the position at data_start.
             current_position = f.tell()
             f.seek(-data_end_length, os.SEEK_END)
             end_position = f.tell()
             data_byte_count = end_position - current_position
             data_count = int(data_byte_count / dtype.itemsize)
             assert_end_of_data(f)
+            
+            # seek back to data start and read the newly calculated
+            # number of samples
             f.seek(current_position, os.SEEK_SET)
             
             data = np.fromfile(f, dtype=dtype, count=data_count)
@@ -447,8 +455,8 @@ class File:
             inp_data = InpData(
                 duration=duration,
                 times=times,
-                event_type=data["event_type"].astype(str),
-                value=data["value"],
+                event_types=data["event_types"].astype(str),
+                values=data["values"],
             )
             
         self._inp_data = inp_data

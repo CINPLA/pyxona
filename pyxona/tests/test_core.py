@@ -54,9 +54,9 @@ def test_inp_reader():
     axona_file = pyxona.File(axona_file_path)
     
     times = np.load(os.path.join(test_data_dir, "inp_times.npy"))
-    event_type = np.load(os.path.join(test_data_dir, "inp_event_type.npy"))
-    value = np.load(os.path.join(test_data_dir, "inp_value.npy"))
+    event_types = np.load(os.path.join(test_data_dir, "inp_event_type.npy"))
+    values = np.load(os.path.join(test_data_dir, "inp_value.npy"))
     
     assert _check_array_equal(times, axona_file.inp_data.times)
-    assert _check_array_equal(event_type, axona_file.inp_data.event_type)
-    assert _check_array_equal(value, axona_file.inp_data.value)
+    assert _check_array_equal(event_types, axona_file.inp_data.event_types)
+    assert _check_array_equal(values, axona_file.inp_data.values)
