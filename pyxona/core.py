@@ -6,7 +6,7 @@ Depends on: sys
             datetime
             numpy
             quantities
-            
+
 Authors: Svenn-Arne Dragly @CINPLA,
          Milad H. Mobarhan @CINPLA,
          Mikkel E. Lepperød @CINPLA
@@ -76,7 +76,7 @@ def parse_header_and_leave_cursor(file_handle):
 def assert_end_of_data(file_handle):
     remaining_data = str(file_handle.read(), 'latin1')
     assert(remaining_data.strip() == "data_end")
-    
+
 
 def scale_analog_signal(value, gain, adc_fullscale_mv, bytes_per_sample):
     """
@@ -228,8 +228,8 @@ class TrackingData:
         return "<Axona tracking data: times shape: {}, positions shape: {}>".format(
             self.times.shape, self.positions.shape
         )
-        
-        
+
+
 class InpData:
     def __init__(self, duration, times, event_types, values):
         self.duration = duration
@@ -238,7 +238,7 @@ class InpData:
         self.values = values
 
     def __str__(self):
-        return "<Axona inp data: times shape: {}>".format(self.times.shape)        
+        return "<Axona inp data: times shape: {}>".format(self.times.shape)
 
 
 class CutData:
@@ -250,8 +250,8 @@ class CutData:
         return "<Axona cut data: channel group id: {}, indices shape: {}>".format(
             self.channel_group_id, self.indices.shape
         )
-        
-        
+
+
 class File:
     """
     Class for reading experimental data from an Axona dataset.
@@ -291,7 +291,7 @@ class File:
         self._cuts_dirty = True
         self._inp_data_dirty = True
         self._tracking_dirty = True
-        
+
     @property
     def session(self):
         return self._base_filename
@@ -300,7 +300,7 @@ class File:
     def related_files(self):
         file_path = os.path.join(self._path, self._base_filename)
         cut_files = glob.glob(os.path.join(file_path + "_[0-9]*.cut"))
-        
+
         return glob.glob(os.path.join(file_path + ".*")) + cut_files
 
     def channel_group(self, channel_id):
@@ -329,14 +329,14 @@ class File:
             self._read_tracking()
 
         return self._tracking
-    
+
     @property
     def inp_data(self):
         if self._inp_data_dirty:
             self._read_inp_data()
 
         return self._inp_data
-                
+
     @property
     def cuts(self):
         if self._cuts_dirty:
@@ -396,26 +396,26 @@ class File:
         global_channel_index = channel_group_index * 4 + channel_index
         param_name = "gain_ch_{}".format(global_channel_index)
         return float(self.attrs[param_name])
-        
+
     def _read_inp_data(self):
         """
         Reads axona .inp files.
-        Event type can be 'I', 'O', or 'K' representing input, 
-        output, and keypress, respectively. 
-        The value of all event types is assumed to have dtype='>i', 
+        Event type can be 'I', 'O', or 'K' representing input,
+        output, and keypress, respectively.
+        The value of all event types is assumed to have dtype='>i',
         even though this is not true for keypress.
         """
         inp_filename = os.path.join(self._path, self._base_filename + ".inp")
         if not os.path.exists(inp_filename):
             raise IOError("'.inp' file not found:" + inp_filename)
-        
+
         with open(inp_filename, "rb") as f:
             attrs = parse_header_and_leave_cursor(f)
-            
+
             sample_rate_split = attrs["timebase"].split(" ")
             assert(sample_rate_split[1] == "hz")
             sample_rate = float(sample_rate_split[0]) * pq.Hz  # sample_rate 50.0 hz
-            
+
             duration = float(attrs["duration"]) * pq.s
             num_inp_samples = int(attrs["num_inp_samples"])
             bytes_per_timestamp = int(attrs["bytes_per_timestamp"])
@@ -425,13 +425,13 @@ class File:
             timestamp_dtype = ">i" + str(bytes_per_timestamp)
             type_dtype = "S"
             value_dtype = 'i1'
-            
+
             # read data:
             dtype = np.dtype([("t", (timestamp_dtype, 1)),
                               ("event_types", (type_dtype, bytes_per_type)),
                               ("values", (value_dtype, bytes_per_value))])
-            
-            # num_inp_samples cannot be used because it 
+
+            # num_inp_samples cannot be used because it
             # does not include outputs ('O').
             # We need to find the length of the data manually
             # by seeking to the end of the file and subtracting
@@ -442,31 +442,31 @@ class File:
             data_byte_count = end_position - current_position
             data_count = int(data_byte_count / dtype.itemsize)
             assert_end_of_data(f)
-            
+
             # seek back to data start and read the newly calculated
             # number of samples
             f.seek(current_position, os.SEEK_SET)
-            
+
             data = np.fromfile(f, dtype=dtype, count=data_count)
-            
-            assert_end_of_data(f)            
+
+            assert_end_of_data(f)
             times = data["t"].astype(float) / sample_rate
-            
+
             inp_data = InpData(
                 duration=duration,
                 times=times,
                 event_types=data["event_types"].astype(str),
                 values=data["values"],
             )
-            
+
         self._inp_data = inp_data
         self._inp_data_dirty = False
-        
-    def _read_tracking(self):    
+
+    def _read_tracking(self):
         pos_filename = os.path.join(self._path, self._base_filename + ".pos")
         if not os.path.exists(pos_filename):
             raise IOError("'.pos' file not found:" + pos_filename)
-            
+
         with open(pos_filename, "rb") as f:
             attrs = parse_header_and_leave_cursor(f)
 
@@ -491,9 +491,9 @@ class File:
             dtype = np.dtype([("t", (timestamp_dtype, 1)),
                               ("coords", (coord_dtype, 1), 2 * self._tracked_spots_count),
                               ("pixel_count", (pixel_count_dtype, 1), 2)])
-        
+
             data = np.fromfile(f, dtype=dtype, count=pos_samples_count)
-            
+
             try:
                 assert_end_of_data(f)
             except AssertionError:
@@ -501,27 +501,27 @@ class File:
 
             time_scale = float(attrs["timebase"].split(" ")[0]) * pq.Hz
             times = data["t"].astype(float) / time_scale
-        
-            window_min_x = float(attrs["window_min_x"]) 
-            window_max_x = float(attrs["window_max_x"]) 
-            window_min_y = float(attrs["window_min_y"]) 
-            window_max_y = float(attrs["window_max_y"]) 
+
+            window_min_x = float(attrs["window_min_x"])
+            window_max_x = float(attrs["window_max_x"])
+            window_min_y = float(attrs["window_min_y"])
+            window_max_y = float(attrs["window_max_y"])
             xsize = window_max_x - window_min_x
             ysize = window_max_y - window_min_y
             length_scale = [xsize, ysize, xsize, ysize]
             coords = data["coords"].astype(float) * pq.m
-            
-            # dacq doc: positions with value 1023 are missing 
+
+            # dacq doc: positions with value 1023 are missing
             for i in range(2 * self._tracked_spots_count):
                 coords[:, i] /= length_scale[i]
                 coords[np.where(data["coords"][:, i] == 1023)] = np.nan * pq.m
-                    
+
             tracking_data = TrackingData(
                 times=times,
                 positions=coords,
                 attrs=attrs
             )
-    
+
         self._tracking = tracking_data
         self._tracking_dirty = False
 
@@ -586,14 +586,14 @@ class File:
                 )
 
                 self._analog_signals.append(analog_signal)
-                
+
         self._analog_signals_dirty = False
 
     def _read_cuts(self):
         self._cuts = []
         cut_basename = os.path.join(self._path, self._base_filename)
         cut_files = glob.glob(cut_basename + "_[0-9]*.cut")
-        
+
         if not len(cut_files) > 0:
             raise IOError("'.cut' file(s) not found")
 
@@ -610,11 +610,11 @@ class File:
                 lines = lines.replace("\n", "").strip()
                 indices = []
                 indices += list(map(int, lines.split("  ")))
-                
+
                 cut = CutData(
                     channel_group_id=channel_group_id,
                     indices=np.asarray(indices, dtype=np.int)
                 )
                 self._cuts.append(cut)
-                
+
         self._cuts_dirty = False
