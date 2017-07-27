@@ -605,8 +605,13 @@ class File:
 
         for cut_filename in sorted(cut_files):
             split_basename = os.path.basename(cut_filename).split(self._base_filename+"_")[-1]
-            suffix = split_basename.split('.')[0]
-            channel_group_id = int(suffix) - 1  # -1 to match channel_group_id
+            suffix = os.path.splitext(split_basename)[0]
+            try:
+                channel_group_id = int(suffix) - 1  # -1 to match channel_group_id
+            except ValueError as e:
+                warnings.warn(str(e) + ' Unable to load cut file "' +
+                              cut_filename + '".')
+                continue
             lines = ""
             with open(cut_filename, "r") as f:
                 for line in f:
