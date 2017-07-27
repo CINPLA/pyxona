@@ -607,10 +607,16 @@ class File:
                     if line.lstrip().startswith('Exact_cut_for'):
                         break
                 lines = f.read()
-                lines = lines.replace("\n", "").strip()
+                lines = lines.rstrip()
                 indices = []
-                indices += list(map(int, lines.split("  ")))
-
+                try:
+                    indices += [int(b) for b in lines.split(' ')
+                                if b.isnumeric()]
+                except Exception as e:
+                    raise(type(e)(str(e) +
+                                  " Invalid indices in cut file '" +
+                                  cut_filename + "'."
+                          ).with_traceback(sys.exc_info()[2]))
                 cut = CutData(
                     channel_group_id=channel_group_id,
                     indices=np.asarray(indices, dtype=np.int)
