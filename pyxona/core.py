@@ -19,6 +19,7 @@ from __future__ import with_statement
 import sys
 import quantities as pq
 import os
+import warnings
 import glob
 import numpy as np
 from datetime import datetime
@@ -543,7 +544,12 @@ class File:
                 suffix = "1"
             suffix = int(suffix)
             with open(eeg_filename, "rb") as f:
-                attrs = parse_header_and_leave_cursor(f)
+                try:
+                    attrs = parse_header_and_leave_cursor(f)
+                except OSError as e:
+                    warnings.warn(str(e) + ' Unable to load "' + eeg_filename +
+                                  '".')
+                    continue
                 attrs["raw_filename"] = eeg_filename
 
                 if file_type == "eeg":
