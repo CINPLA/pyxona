@@ -618,7 +618,7 @@ class File:
                     if line.lstrip().startswith('Exact_cut_for'):
                         break
                 lines = f.read()
-                lines = lines.rstrip()
+                lines = lines.replace("\n", "").strip()
                 indices = []
                 try:
                     indices += [int(b) for b in lines.split(' ')
