@@ -11,7 +11,7 @@ before_script:
   - pip install pytest pyyaml coverage codecov quantities numpy
   - python setup.py install
 script:
-  - coverage run --source pyxona -m py.test -s --doctest-glob='*.rst'
+  - coverage run --source pyxona -m py.test -s
   - coverage report
   - source libs/travis-conda-scripts/scripts/config.sh
   - bash -ex libs/travis-conda-scripts/scripts/build.sh
