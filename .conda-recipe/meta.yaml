@@ -7,9 +7,9 @@ build:
     # noarch: python  # TODO Add back noarch when it works properly on Windows,
                       # we are converting packages manually now
     script:
-    - pip install quantities
+    - pip install quantities==0.12.1
     - python setup.py install
-    
+
 requirements:
     build:
         - python
