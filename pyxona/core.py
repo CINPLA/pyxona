@@ -347,16 +347,21 @@ class File:
 
     def _read_channel_groups(self):
         # TODO this file reading can be removed, perhaps?
-        channel_group_filenames = glob.glob(os.path.join(self._path, self._base_filename) + ".[0-9]*")
-
+        channel_group_filenames = glob.glob(
+            os.path.join(self._path, self._base_filename) + ".[0-9]*")
+        channel_group_filenames = sorted(
+            channel_group_filenames,
+            key=lambda x: os.path.splitext(x)[1][1:])
         self._channel_id_to_channel_group = {}
         self._channel_group_id_to_channel_group = {}
         self._channel_count = 0
         self._channel_groups = []
-        for channel_group_filename in channel_group_filenames:
+        for ii, channel_group_filename in enumerate(channel_group_filenames):
             # increment before, because channel_groups start at 1
             basename, extension = os.path.splitext(channel_group_filename)
             channel_group_id = int(extension[1:]) - 1
+            if ii != channel_group_id:
+                raise IOError('Missing channel group file, unable to map channel ids')
             with open(channel_group_filename, "rb") as f:
                 channel_group_attrs = parse_header_and_leave_cursor(f)
                 num_chans = channel_group_attrs["num_chans"]
@@ -365,7 +370,8 @@ class File:
                     channel_id = self._channel_count + i
                     channel = Channel(
                         channel_id,
-                        name="channel_{}_channel_group_{}_internal_{}".format(channel_id, channel_group_id, i),
+                        name="channel_{}_channel_group_{}_internal_{}".format(
+                            channel_id, channel_group_id, i),
                         gain=self._channel_gain(channel_group_id, i)
                     )
                     channels.append(channel)
