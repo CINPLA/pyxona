@@ -346,17 +346,31 @@ class File:
         return self._cuts
 
     def _read_channel_groups(self):
+        self._channel_id_to_channel_group = {}
+        self._channel_group_id_to_channel_group = {}
+        self._channel_count = 0
+        self._channel_groups = []
+
         # TODO this file reading can be removed, perhaps?
         channel_group_filenames = glob.glob(
             os.path.join(self._path, self._base_filename) + ".[0-9]*")
         channel_group_filenames = sorted(
             channel_group_filenames,
             key=lambda x: os.path.splitext(x)[1][1:])
-        self._channel_id_to_channel_group = {}
-        self._channel_group_id_to_channel_group = {}
-        self._channel_count = 0
-        self._channel_groups = []
-        for ii, channel_group_filename in enumerate(channel_group_filenames):
+
+        _, extension = os.path.splitext(channel_group_filenames[0])
+        start_channel_group = int(extension[1:]) - 1
+        if start_channel_group != 0:
+            print(
+                'Warning: channel group file starts at {} '.format(start_channel_group) +
+                'assumes that channel groups not saved have the same channel ' +
+                'count and infers channel ids from that.')
+            with open(channel_group_filenames[0], "rb") as f:
+                channel_group_attrs = parse_header_and_leave_cursor(f)
+                num_chans = channel_group_attrs["num_chans"]
+                self._channel_count = (start_channel_group + 1) * num_chans
+
+        for ii, channel_group_filename in enumerate(channel_group_filenames, start_channel_group):
             # increment before, because channel_groups start at 1
             basename, extension = os.path.splitext(channel_group_filename)
             channel_group_id = int(extension[1:]) - 1
@@ -574,10 +588,18 @@ class File:
                 data = np.fromfile(f, dtype=sample_dtype, count=sample_count)
                 assert_end_of_data(f)
 
-                eeg_final_channel_id = self.attrs["EEG_ch_" + str(suffix)]
+                eeg_final_channel_id = self.attrs["EEG_ch_" + str(suffix)] - 1 # EEG channels are counted from 1, other channels are from 0
+                assert self.attrs["saveEEG_ch_" + str(suffix)] == 1
                 eeg_mode = self.attrs["mode_ch_" + str(eeg_final_channel_id)]
-                ref_id = self.attrs["b_in_ch_" + str(eeg_final_channel_id)]
-                eeg_original_channel_id = self.attrs["ref_" + str(ref_id)]
+                if eeg_mode == 0: # signal
+                    eeg_original_channel_id = eeg_final_channel_id
+                elif eeg_mode == 1: # ref
+                    ref_id = self.attrs["b_in_ch_" + str(eeg_final_channel_id)]
+                    eeg_original_channel_id = self.attrs["ref_" + str(ref_id)]
+                else:
+                    raise ValueError(
+                        'Not sure how to retrieve original channel from mode ' +
+                        '{}'.format(eeg_mode))
 
                 attrs["channel_id"] = eeg_original_channel_id
 
