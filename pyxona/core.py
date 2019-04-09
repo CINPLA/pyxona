@@ -361,8 +361,8 @@ class File:
         _, extension = os.path.splitext(channel_group_filenames[0])
         start_channel_group = int(extension[1:]) - 1
         if start_channel_group != 0:
-            print(
-                'Warning: channel group file starts at {} '.format(start_channel_group) +
+            warnings.warn(
+                'Channel group file starts at {} '.format(start_channel_group) +
                 'assumes that channel groups not saved have the same channel ' +
                 'count and infers channel ids from that.')
             with open(channel_group_filenames[0], "rb") as f:
@@ -518,7 +518,7 @@ class File:
             try:
                 assert_end_of_data(f)
             except AssertionError:
-                print("WARNING: found remaining data while parsing pos file")
+                warnings.warn("Found remaining data while parsing pos file")
 
             time_scale = float(attrs["timebase"].split(" ")[0]) * pq.Hz
             times = data["t"].astype(float) / time_scale
@@ -589,6 +589,11 @@ class File:
                 assert_end_of_data(f)
 
                 eeg_final_channel_id = self.attrs["EEG_ch_" + str(suffix)] - 1 # EEG channels are counted from 1, other channels are from 0
+                if eeg_final_channel_id == -1:
+                    warnings.warn(
+                        'eeg saved, but not reffering to any channel' +
+                        ' skipping', eeg_filename)
+                    continue
                 assert self.attrs["saveEEG_ch_" + str(suffix)] == 1
                 eeg_mode = self.attrs["mode_ch_" + str(eeg_final_channel_id)]
                 if eeg_mode == 0: # signal
@@ -597,9 +602,10 @@ class File:
                     ref_id = self.attrs["b_in_ch_" + str(eeg_final_channel_id)]
                     eeg_original_channel_id = self.attrs["ref_" + str(ref_id)]
                 else:
-                    raise ValueError(
+                    warnings.warn(
                         'Not sure how to retrieve original channel from mode ' +
-                        '{}'.format(eeg_mode))
+                        '{}, skipping'.format(eeg_mode))
+                    continue
 
                 attrs["channel_id"] = eeg_original_channel_id
 
