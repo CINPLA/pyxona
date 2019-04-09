@@ -592,7 +592,7 @@ class File:
                 if eeg_final_channel_id == -1:
                     warnings.warn(
                         'eeg saved, but not reffering to any channel' +
-                        ' skipping', eeg_filename)
+                        ' skipping {}'.format(eeg_filename))
                     continue
                 assert self.attrs["saveEEG_ch_" + str(suffix)] == 1
                 eeg_mode = self.attrs["mode_ch_" + str(eeg_final_channel_id)]
