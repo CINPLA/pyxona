@@ -506,12 +506,14 @@ class File:
             bytes_per_pixel_count = 4
             pixel_count_dtype = ">i" + str(bytes_per_pixel_count)
 
-            bytes_per_pos = (bytes_per_timestamp + 2 * self._tracked_spots_count * bytes_per_coord + 8)  # pos_format is as follows for this file t,x1,y1,x2,y2,numpix1,numpix2.
-
+            # pos_format is as follows for this file t,x1,y1,x2,y2,numpix1,numpix2.
+            data_spots_count = 2
+            assert attrs['pos_format'] == 't,x1,y1,x2,y2,numpix1,numpix2', (
+                'We only support the given pos format')
             # read data:
             dtype = np.dtype([("t", (timestamp_dtype, 1)),
-                              ("coords", (coord_dtype, 1), 2 * self._tracked_spots_count),
-                              ("pixel_count", (pixel_count_dtype, 1), 2)])
+                             ("coords", (coord_dtype, 1), 2 * data_spots_count),
+                             ("pixel_count", (pixel_count_dtype, 1), data_spots_count)])
 
             data = np.fromfile(f, dtype=dtype, count=pos_samples_count)
 
@@ -531,11 +533,10 @@ class File:
             ysize = window_max_y - window_min_y
             length_scale = [xsize, ysize, xsize, ysize]
             coords = data["coords"].astype(float) * pq.m
-
             # dacq doc: positions with value 1023 are missing
-            for i in range(2 * self._tracked_spots_count):
+            coords[data["coords"] == 1023] = np.nan * pq.m
+            for i in range(2 * data_spots_count):
                 coords[:, i] /= length_scale[i]
-                coords[np.where(data["coords"][:, i] == 1023)] = np.nan * pq.m
 
             tracking_data = TrackingData(
                 times=times,

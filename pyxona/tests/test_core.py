@@ -44,7 +44,6 @@ def test_pos_reader():
     axona_file = pyxona.File(axona_file_path)
     positions = np.load(os.path.join(test_data_dir, "positions.npy"))
     pos_times = np.load(os.path.join(test_data_dir, "pos_times.npy"))
-
     assert _check_array_equal(positions, axona_file.tracking.positions)
     assert _check_array_equal(pos_times, axona_file.tracking.times)
 
