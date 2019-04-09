@@ -604,7 +604,7 @@ class File:
                 else:
                     warnings.warn(
                         'Not sure how to retrieve original channel from mode ' +
-                        '{}, skipping'.format(eeg_mode))
+                        '{}, skipping {}'.format(eeg_mode, eeg_filename))
                     continue
 
                 attrs["channel_id"] = eeg_original_channel_id
