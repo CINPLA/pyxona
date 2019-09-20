@@ -35,7 +35,8 @@ def test_analog_signal_reader():
     axona_file = pyxona.File(axona_file_path)
 
     for i, analog_signal in enumerate(axona_file.analog_signals):
-        signal = np.load(os.path.join(test_data_dir, "analog_signal_"+str(i)+".npy"))
+        signal = np.load(
+            os.path.join(test_data_dir, "analog_signal_"+str(i)+".npy"))
         assert _check_array_equal(signal, analog_signal.signal)
 
 
@@ -43,7 +44,6 @@ def test_pos_reader():
     axona_file = pyxona.File(axona_file_path)
     positions = np.load(os.path.join(test_data_dir, "positions.npy"))
     pos_times = np.load(os.path.join(test_data_dir, "pos_times.npy"))
-
     assert _check_array_equal(positions, axona_file.tracking.positions)
     assert _check_array_equal(pos_times, axona_file.tracking.times)
 

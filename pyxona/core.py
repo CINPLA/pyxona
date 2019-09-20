@@ -346,17 +346,36 @@ class File:
         return self._cuts
 
     def _read_channel_groups(self):
-        # TODO this file reading can be removed, perhaps?
-        channel_group_filenames = glob.glob(os.path.join(self._path, self._base_filename) + ".[0-9]*")
-
         self._channel_id_to_channel_group = {}
         self._channel_group_id_to_channel_group = {}
         self._channel_count = 0
         self._channel_groups = []
-        for channel_group_filename in channel_group_filenames:
+
+        # TODO this file reading can be removed, perhaps?
+        channel_group_filenames = glob.glob(
+            os.path.join(self._path, self._base_filename) + ".[0-9]*")
+        channel_group_filenames = sorted(
+            channel_group_filenames,
+            key=lambda x: os.path.splitext(x)[1][1:])
+
+        _, extension = os.path.splitext(channel_group_filenames[0])
+        start_channel_group = int(extension[1:]) - 1
+        if start_channel_group != 0:
+            warnings.warn(
+                'Channel group file starts at {} '.format(start_channel_group) +
+                'assumes that channel groups not saved have the same channel ' +
+                'count and infers channel ids from that.')
+            with open(channel_group_filenames[0], "rb") as f:
+                channel_group_attrs = parse_header_and_leave_cursor(f)
+                num_chans = channel_group_attrs["num_chans"]
+                self._channel_count = (start_channel_group + 1) * num_chans
+
+        for ii, channel_group_filename in enumerate(channel_group_filenames, start_channel_group):
             # increment before, because channel_groups start at 1
             basename, extension = os.path.splitext(channel_group_filename)
             channel_group_id = int(extension[1:]) - 1
+            if ii != channel_group_id:
+                raise IOError('Missing channel group file, unable to map channel ids')
             with open(channel_group_filename, "rb") as f:
                 channel_group_attrs = parse_header_and_leave_cursor(f)
                 num_chans = channel_group_attrs["num_chans"]
@@ -365,7 +384,8 @@ class File:
                     channel_id = self._channel_count + i
                     channel = Channel(
                         channel_id,
-                        name="channel_{}_channel_group_{}_internal_{}".format(channel_id, channel_group_id, i),
+                        name="channel_{}_channel_group_{}_internal_{}".format(
+                            channel_id, channel_group_id, i),
                         gain=self._channel_gain(channel_group_id, i)
                     )
                     channels.append(channel)
@@ -486,19 +506,21 @@ class File:
             bytes_per_pixel_count = 4
             pixel_count_dtype = ">i" + str(bytes_per_pixel_count)
 
-            bytes_per_pos = (bytes_per_timestamp + 2 * self._tracked_spots_count * bytes_per_coord + 8)  # pos_format is as follows for this file t,x1,y1,x2,y2,numpix1,numpix2.
-
+            # pos_format is as follows for this file t,x1,y1,x2,y2,numpix1,numpix2.
+            data_spots_count = 2
+            assert attrs['pos_format'] == 't,x1,y1,x2,y2,numpix1,numpix2', (
+                'We only support the given pos format')
             # read data:
             dtype = np.dtype([("t", (timestamp_dtype, 1)),
-                              ("coords", (coord_dtype, 1), 2 * self._tracked_spots_count),
-                              ("pixel_count", (pixel_count_dtype, 1), 2)])
+                             ("coords", (coord_dtype, 1), 2 * data_spots_count),
+                             ("pixel_count", (pixel_count_dtype, 1), data_spots_count)])
 
             data = np.fromfile(f, dtype=dtype, count=pos_samples_count)
 
             try:
                 assert_end_of_data(f)
             except AssertionError:
-                print("WARNING: found remaining data while parsing pos file")
+                warnings.warn("Found remaining data while parsing pos file")
 
             time_scale = float(attrs["timebase"].split(" ")[0]) * pq.Hz
             times = data["t"].astype(float) / time_scale
@@ -511,11 +533,10 @@ class File:
             ysize = window_max_y - window_min_y
             length_scale = [xsize, ysize, xsize, ysize]
             coords = data["coords"].astype(float) * pq.m
-
             # dacq doc: positions with value 1023 are missing
-            for i in range(2 * self._tracked_spots_count):
+            coords[data["coords"] == 1023] = np.nan * pq.m
+            for i in range(2 * data_spots_count):
                 coords[:, i] /= length_scale[i]
-                coords[np.where(data["coords"][:, i] == 1023)] = np.nan * pq.m
 
             tracking_data = TrackingData(
                 times=times,
@@ -568,10 +589,24 @@ class File:
                 data = np.fromfile(f, dtype=sample_dtype, count=sample_count)
                 assert_end_of_data(f)
 
-                eeg_final_channel_id = self.attrs["EEG_ch_" + str(suffix)]
+                eeg_final_channel_id = self.attrs["EEG_ch_" + str(suffix)] - 1 # EEG channels are counted from 1, other channels are from 0
+                if eeg_final_channel_id == -1:
+                    warnings.warn(
+                        'eeg saved, but not reffering to any channel' +
+                        ' skipping {}'.format(eeg_filename))
+                    continue
+                assert self.attrs["saveEEG_ch_" + str(suffix)] == 1
                 eeg_mode = self.attrs["mode_ch_" + str(eeg_final_channel_id)]
-                ref_id = self.attrs["b_in_ch_" + str(eeg_final_channel_id)]
-                eeg_original_channel_id = self.attrs["ref_" + str(ref_id)]
+                if eeg_mode == 0: # signal
+                    eeg_original_channel_id = eeg_final_channel_id
+                elif eeg_mode == 1: # ref
+                    ref_id = self.attrs["b_in_ch_" + str(eeg_final_channel_id)]
+                    eeg_original_channel_id = self.attrs["ref_" + str(ref_id)]
+                else:
+                    warnings.warn(
+                        'Not sure how to retrieve original channel from mode ' +
+                        '{}, skipping {}'.format(eeg_mode, eeg_filename))
+                    continue
 
                 attrs["channel_id"] = eeg_original_channel_id
 
