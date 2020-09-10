@@ -610,6 +610,14 @@ class File:
                         'Not sure how to retrieve original channel from mode ' +
                         '{} in {}. '.format(eeg_mode, eeg_filename) +
                         'Please make sure it is the correct gain and channel_id.')
+                elif eeg_mode == 3: # what mode is this??
+                    other_channel = self.attrs["b_in_ch_" + str(eeg_final_channel_id)]
+                    ref_id = self.attrs["b_in_ch_" + str(other_channel)]
+                    eeg_original_channel_id = self.attrs["ref_" + str(ref_id)]
+                    warnings.warn(
+                        'Not sure how to retrieve original channel from mode ' +
+                        '{} in {}. '.format(eeg_mode, eeg_filename) +
+                        'Please make sure it is the correct gain and channel_id.')
                 else:
                     warnings.warn(
                         'Not sure how to retrieve original channel from mode ' +

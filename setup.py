@@ -8,7 +8,7 @@ long_description = open("README.md").read()
 
 entry_points = None
 
-install_requires = []
+install_requires = ['quantities']
 
 setup(
     name="pyxona",

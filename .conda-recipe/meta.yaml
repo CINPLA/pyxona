@@ -1,37 +1,48 @@
 package:
-    name: pyxona
-    version: {{ environ.get("GIT_TAG", "0.0.0_custom")|replace("v", "")|replace("-", "_") }}
+  name: pyxona
+  version: {{ environ.get("GIT_STRING", "0.0.0_custom")|replace("v", "")|replace("-", "_") }}
+
 source:
-    git_url: ..
+  git_url: ..
+
 build:
-    # noarch: python  # TODO Add back noarch when it works properly on Windows,
-                      # we are converting packages manually now
-    script:
-    - pip install quantities==0.12.3
-    - python setup.py install
+  noarch: python
+  script: python -m pip install --no-deps --ignore-installed .
 
 requirements:
-    build:
-        - python
-        - setuptools
-        - pip
-        - numpy
-        - scipy
-    run:
-        - python
-        - setuptools
-        - pip
-        - numpy
-        - scipy
+  host:
+    - python
+    - setuptools
+    - pip
+
+  run:
+    - python
+    - setuptools
+    - numpy
+    - scipy
+    - quantities
+
 test:
+  requires:
+    - pytest
+    - coverage
+    - codecov
+    - sphinx
+    - quantities
+
+  source_files:
+    - tests
+    - docs
   imports:
-      - pyxona
+    - pyxona
+  commands:
+    - python -c "import exdir; print(exdir.__version__)"
+    - coverage run --source tests -m py.test -s
+    - coverage report # [py3k]
+    - codecov # [py3k]
+    - cd docs ; make doctest # [py3k]
+
 about:
-    description: 'IO for expipe and neuroscience data'
-    dev_url: https://github.com/CINPLA/pyxona
-    license: GNU GPLv3
-    license_family: GPL
-    license_file: LICENSE
-extra:
-    recipe-maintainers:
-        - dragly
+  home: https://github.com/CINPLA/pyxona/
+  license: MIT
+  license_file: LICENSE
