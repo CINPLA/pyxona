@@ -265,7 +265,7 @@ class File:
         if extension != ".set":
             raise ValueError("file extension must be '.set'")
 
-        with open(self._absolute_filename, "r") as f:
+        with open(self._absolute_filename, mode="r", encoding="cp1252") as f:
             text = f.read()
 
         attrs = parse_attrs(text)
